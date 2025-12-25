@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package panicker;
+
+// Базовые сообщения
+message Ticker {
+    string symbol = 1;
+    string name = 2;
+}
+
+message Candle {
+    string ticker = 1;
+    double open = 2;
+    double high = 3;
+    double low = 4;
+    double close = 5;
+    int64 volume = 6;
+    string timestamp = 7;
+    string interval = 8;
+}
+
+message PanicSignal {
+    enum SignalType {
+        PANIC = 0;
+        GREED = 1;
+        NEUTRAL = 2;
+    }
+
+    enum Level {
+        STRONG = 0;
+        MODERATE = 1;
+        URGENT = 2;
+        IGNORE = 3;
+    }
+
+    string ticker = 1;
+    SignalType signal_type = 2;
+    Level level = 3;
+    double rsi_14 = 4;
+    double rsi_7 = 5;
+    double rsi_21 = 6;
+    double volume_ratio = 7;
+    double current_price = 8;
+    string detected_at = 9;
+    double risk_metric = 10;
+    repeated VolumeCluster volume_clusters = 11;
+    string interpretation = 12;
+}
+
+message VolumeCluster {
+    double price_level = 1;
+    double volume_percentage = 2;
+    string role = 3; // "support", "resistance", "neutral"
+}
+
+message OverheatIndex {
+    string ticker = 1;
+    double overheat_percentage = 2;  // ← исправлено
+    double current_rsi = 3;
+    double volume_ratio = 4;
+    string last_signal_time = 5;
+    PanicSignal.Level last_signal_level = 6;
+}
+
+message ScanRequest {
+    repeated Ticker tickers = 1;
+    bool real_time = 2;
+}
+
+message ScanResponse {
+    repeated PanicSignal signals = 1;
+    string scan_id = 2;
+    string timestamp = 3;
+    int32 total_scanned = 4;
+    int32 signals_found = 5;
+}
+
+// Сервис для работы с паникой
+service PanickerService {
+    // Основной метод сканирования
+    rpc ScanTickers(ScanRequest) returns (ScanResponse);
+
+    // Получить статус здоровья акции
+    rpc GetOverheatIndex(Ticker) returns (OverheatIndex);
+
+    // Получить историю сигналов
+    rpc GetSignalHistory(HistoryRequest) returns (SignalHistory);
+}
+
+// Сервис для рыночных данных
+service MarketDataService {
+    // Получить свечи для тикера
+    rpc GetCandles(CandleRequest) returns (CandleResponse);
+
+    // Получить текущие цены
+    rpc GetCurrentPrices(PriceRequest) returns (PriceResponse);
+
+    // Получить данные стакана
+    rpc GetOrderBook(OrderBookRequest) returns (OrderBookResponse);
+}
+
+service SignalsService {
+    // Потоковая передача сигналов в реальном времени
+    rpc StreamSignals(StreamRequest) returns (stream PanicSignal);
+
+    // Получить топ сигналов
+    rpc GetTopSignals(TopRequest) returns (TopResponse);
+
+    // Получить статистику за период
+    rpc GetStats(StatsRequest) returns (StatsResponse);
+
+    // Игнорировать тикер
+    rpc IgnoreTicker(IgnoreRequest) returns (IgnoreResponse);
+}
+
+// Вспомогательные сообщения
+message HistoryRequest {
+    string ticker = 1;
+    int32 days_back = 2;
+    string start_date = 3;
+    string end_date = 4;
+    int32 limit = 5;
+}
+
+message SignalHistory {
+    repeated PanicSignal signals = 1;
+    int32 total_count = 2;
+}
+
+message CandleRequest {
+    string ticker = 1;
+    string interval = 2;
+    int32 count = 3;
+}
+
+message CandleResponse {
+    repeated Candle candles = 1;
+    string request_id = 2;
+}
+
+message PriceRequest {
+    repeated string tickers = 1;
+}
+
+message PriceResponse {
+    map<string, double> prices = 1;
+    string timestamp = 2;
+}
+
+message OrderBookRequest {
+    string ticker = 1;
+    int32 depth = 2;
+}
+
+message OrderBookResponse {
+    string ticker = 1;
+    repeated OrderBookEntry bids = 2;
+    repeated OrderBookEntry asks = 3;
+    double spread_percentage = 4;
+}
+
+message OrderBookEntry {
+    double price = 1;
+    int64 quantity = 2;
+}
+
+message StreamRequest {
+    repeated string tickers = 1;
+    bool include_all = 2;
+}
+
+message TopRequest {
+    string period = 1; // "today", "week", "month"
+    int32 limit = 2;
+}
+
+message TopResponse {
+    repeated PanicSignal top_signals = 1;
+    string period = 2;
+}
+
+message IgnoreRequest {
+    string ticker = 1;
+    int32 duration_hours = 2;
+}
+
+message IgnoreResponse {
+    bool success = 1;
+    string ignored_until = 2;
+}
+// ============================================================================
+// СТАТИСТИКА
+// ============================================================================
+
+message StatsRequest {
+    int32 days = 1;  // Количество дней для статистики
+}
+
+message StatsResponse {
+    int32 total_signals = 1;          // Всего сигналов
+    int32 strong_signals = 2;         // 🔴 СИЛЬНЫХ
+    int32 moderate_signals = 3;       // 🟡 УМЕРЕННЫХ
+    int32 urgent_signals = 4;         // ⚪ СРОЧНЫХ
+    string most_active_ticker = 5;    // Самый активный тикер
+    int32 most_active_count = 6;      // Количество сигналов у самого активного
+    string most_calm_ticker = 7;      // Самый спокойный тикер (с сигналами)
+    int32 most_calm_count = 8;        // Количество сигналов у самого спокойного
+    string market_tension = 9;        // Общая напряжённость рынка
+}
